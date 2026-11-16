@@ -285,16 +285,16 @@ class MainActivity : Activity() {
         }
     }
 
+    @Synchronized
     @Throws(IOException::class)
     private fun sendCommand(command: String, timeoutMs: Int): String {
         val socket = bluetoothSocket ?: throw IOException("Нет Bluetooth-соединения")
         val streamIn = input ?: throw IOException("Входной поток не открыт")
         val streamOut = output ?: throw IOException("Выходной поток не открыт")
 
-        synchronized(this) {
-            streamOut.write((command + "\r").toByteArray(Charsets.US_ASCII))
-            streamOut.flush()
-        }
+        // Keep write + response read atomic: concurrent commands would mix ELM327 replies.
+        streamOut.write((command + "\r").toByteArray(Charsets.US_ASCII))
+        streamOut.flush()
 
         val result = StringBuilder()
         val buffer = ByteArray(256)
