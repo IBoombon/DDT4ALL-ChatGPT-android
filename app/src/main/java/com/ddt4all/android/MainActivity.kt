@@ -299,16 +299,30 @@ class MainActivity : Activity() {
         val result = StringBuilder()
         val buffer = ByteArray(256)
         val startedAt = System.currentTimeMillis()
+
+        // Bluetooth RFCOMM InputStream.read() can block indefinitely on some adapters.
+        // Poll available() so the command has a real upper time limit.
         while (System.currentTimeMillis() - startedAt < timeoutMs) {
             if (!socket.isConnected) throw IOException("Bluetooth-соединение разорвано")
-            try {
-                val count = streamIn.read(buffer)
+
+            val availableBytes = try {
+                streamIn.available()
+            } catch (e: IOException) {
+                throw IOException("Ошибка чтения Bluetooth: ${e.message}", e)
+            }
+
+            if (availableBytes > 0) {
+                val count = streamIn.read(buffer, 0, minOf(buffer.size, availableBytes))
                 if (count < 0) throw IOException("Адаптер закрыл соединение")
-                val chunk = String(buffer, 0, count, Charsets.US_ASCII)
-                result.append(chunk)
+                result.append(String(buffer, 0, count, Charsets.US_ASCII))
                 if (result.contains(">")) break
-            } catch (_: java.net.SocketTimeoutException) {
-                break
+            } else {
+                try {
+                    Thread.sleep(40)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw IOException("Чтение прервано", e)
+                }
             }
         }
         return result.toString().replace(">", "").trim()
