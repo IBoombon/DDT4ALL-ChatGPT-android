@@ -302,11 +302,11 @@ class MainActivity : Activity() {
                     sendCommand(command, 6000)
                 }
                 runOnUiThread {
-                    appendLog("> $command ($label)\n\${response.ifBlank { "(ответ не получен до таймаута)" }}")
+                    appendLog("> $command ($label)\n${response.ifBlank { "(ответ не получен до таймаута)" }}")
                     appendLog(formatReadOnlyResult(command, response))
                 }
             } catch (e: Exception) {
-                runOnUiThread { appendLog("Ошибка $label: \${e.message}") }
+                runOnUiThread { appendLog("Ошибка $label: ${e.message}") }
             }
         }
     }
@@ -317,7 +317,7 @@ class MainActivity : Activity() {
             "ATDP" -> if (response.isBlank()) {
                 "Адаптер не сообщил название протокола."
             } else {
-                "Ответ адаптера о протоколе: \${response.trim()}"
+                "Ответ адаптера о протоколе: ${response.trim()}"
             }
             "0100" -> {
                 val match = Regex("4100([0-9A-F]{8})").find(compact)
@@ -337,7 +337,7 @@ class MainActivity : Activity() {
                 if (match != null) {
                     val value = match.groupValues[1].toLong(16)
                     val rpm = value / 4.0
-                    "Расчётные обороты двигателя: \${"%.0f".format(java.util.Locale.US, rpm)} об/мин."
+                    "Расчётные обороты двигателя: ${"%.0f".format(java.util.Locale.US, rpm)} об/мин."
                 } else {
                     "Обороты не распознаны. Возможны NO DATA, неподдерживаемый PID или ответ другого формата."
                 }
@@ -345,7 +345,7 @@ class MainActivity : Activity() {
             "010D" -> {
                 val match = Regex("410D([0-9A-F]{2})").find(compact)
                 if (match != null) {
-                    "Расчётная скорость: \${match.groupValues[1].toInt(16)} км/ч."
+                    "Расчётная скорость: ${match.groupValues[1].toInt(16)} км/ч."
                 } else {
                     "Скорость не распознана. Возможны NO DATA, неподдерживаемый PID или ответ другого формата."
                 }
@@ -357,7 +357,7 @@ class MainActivity : Activity() {
                     "Получен сырой ответ режима чтения кодов неисправностей. Автоматическая расшифровка будет добавлена после проверки форматов ответов."
                 }
             }
-            else -> "Получен ответ: \${response.ifBlank { "(нет ответа)" }}"
+            else -> "Получен ответ: ${response.ifBlank { "(нет ответа)" }}"
         }
     }
 
