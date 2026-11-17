@@ -33,6 +33,7 @@ class MainActivity : Activity() {
     private var input: InputStream? = null
     private var output: OutputStream? = null
     private var connectedDeviceName: String? = null
+    private val elmCommandLock = Any()
 
     private lateinit var status: TextView
     private lateinit var logView: TextView
@@ -83,8 +84,24 @@ class MainActivity : Activity() {
         }
 
         val testButton = Button(this).apply {
-            text = "Проверить связь (команда 0100)"
+            text = "Проверить поддержку OBD-II (0100)"
             setOnClickListener { runObdTest() }
+        }
+        val protocolButton = Button(this).apply {
+            text = "Определить протокол адаптера (ATDP)"
+            setOnClickListener { runReadOnlyCommand("Протокол адаптера", "ATDP") }
+        }
+        val rpmButton = Button(this).apply {
+            text = "Обороты двигателя (010C)"
+            setOnClickListener { runReadOnlyCommand("Обороты двигателя", "010C") }
+        }
+        val speedButton = Button(this).apply {
+            text = "Скорость автомобиля (010D)"
+            setOnClickListener { runReadOnlyCommand("Скорость автомобиля", "010D") }
+        }
+        val dtcButton = Button(this).apply {
+            text = "Чтение кодов ошибок (03)"
+            setOnClickListener { runReadOnlyCommand("Коды ошибок (режим 03)", "03") }
         }
 
         logView = TextView(this).apply {
@@ -101,6 +118,10 @@ class MainActivity : Activity() {
         content.addView(connectButton, matchWrap())
         content.addView(disconnectButton, matchWrap())
         content.addView(testButton, matchWrap())
+        content.addView(protocolButton, matchWrap())
+        content.addView(rpmButton, matchWrap())
+        content.addView(speedButton, matchWrap())
+        content.addView(dtcButton, matchWrap())
 
         val futureFeatures = listOf(
             "Идентификация ЭБУ",
@@ -248,40 +269,95 @@ class MainActivity : Activity() {
 
     private fun initializeElm327() {
         val commands = listOf("ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP0")
-        for (command in commands) {
-            if (bluetoothSocket?.isConnected != true) return
-            try {
-                val response = sendCommand(command, 4500)
-                runOnUiThread { appendLog("> $command\n${response.ifBlank { "(нет ответа до таймаута)" }}") }
-            } catch (e: Exception) {
-                runOnUiThread { appendLog("Ошибка команды $command: ${e.message}") }
-                return
+        synchronized(elmCommandLock) {
+            for (command in commands) {
+                if (bluetoothSocket?.isConnected != true) return
+                try {
+                    val response = sendCommand(command, 4500)
+                    runOnUiThread { appendLog("> $command\n${response.ifBlank { "(нет ответа до таймаута)" }}") }
+                } catch (e: Exception) {
+                    runOnUiThread { appendLog("Ошибка команды $command: ${e.message}") }
+                    return
+                }
             }
         }
         runOnUiThread { appendLog("Инициализация ELM327 завершена. Можно выполнить проверку 0100.") }
     }
 
     private fun runObdTest() {
+        runReadOnlyCommand("Поддержка стандартных PID", "0100")
+    }
+
+    private fun runReadOnlyCommand(label: String, command: String) {
         if (bluetoothSocket?.isConnected != true) {
             appendLog("Сначала подключите ELM327.")
             return
         }
-        thread(name = "elm327-obd-test") {
+        thread(name = "elm327-read-only") {
             try {
-                val response = sendCommand("0100", 5000)
-                runOnUiThread {
-                    appendLog("> 0100\n${response.ifBlank { "(ответ не получен)" }}")
-                    if (response.contains("41 00", ignoreCase = true) ||
-                        response.contains("4100", ignoreCase = true)
-                    ) {
-                        appendLog("Получен ответ на запрос поддерживаемых параметров OBD-II.")
-                    } else {
-                        appendLog("Ответ не подтверждает успешный OBD-II запрос. Для Renault могут потребоваться другие протоколы/инициализация.")
+                val response = synchronized(elmCommandLock) {
+                    if (bluetoothSocket?.isConnected != true) {
+                        throw IOException("Bluetooth-соединение отсутствует")
                     }
+                    sendCommand(command, 6000)
+                }
+                runOnUiThread {
+                    appendLog("> $command ($label)\n\${response.ifBlank { "(ответ не получен до таймаута)" }}")
+                    appendLog(formatReadOnlyResult(command, response))
                 }
             } catch (e: Exception) {
-                runOnUiThread { appendLog("Ошибка теста 0100: ${e.message}") }
+                runOnUiThread { appendLog("Ошибка $label: \${e.message}") }
             }
+        }
+    }
+
+    private fun formatReadOnlyResult(command: String, response: String): String {
+        val compact = response.uppercase().replace(Regex("[^0-9A-F]"), "")
+        return when (command) {
+            "ATDP" -> if (response.isBlank()) {
+                "Адаптер не сообщил название протокола."
+            } else {
+                "Ответ адаптера о протоколе: \${response.trim()}"
+            }
+            "0100" -> {
+                val match = Regex("4100([0-9A-F]{8})").find(compact)
+                if (match != null) {
+                    val mask = match.groupValues[1]
+                    if (mask == "00000000") {
+                        "ЭБУ вернул нулевую маску поддерживаемых PID. Это не доказывает отсутствие связи с Renault ЭБУ."
+                    } else {
+                        "Получена маска поддерживаемых PID: $mask"
+                    }
+                } else {
+                    "Не удалось распознать стандартный ответ 0100. Сохрани сырой ответ для анализа."
+                }
+            }
+            "010C" -> {
+                val match = Regex("410C([0-9A-F]{4})").find(compact)
+                if (match != null) {
+                    val value = match.groupValues[1].toLong(16)
+                    val rpm = value / 4.0
+                    "Расчётные обороты двигателя: \${"%.0f".format(java.util.Locale.US, rpm)} об/мин."
+                } else {
+                    "Обороты не распознаны. Возможны NO DATA, неподдерживаемый PID или ответ другого формата."
+                }
+            }
+            "010D" -> {
+                val match = Regex("410D([0-9A-F]{2})").find(compact)
+                if (match != null) {
+                    "Расчётная скорость: \${match.groupValues[1].toInt(16)} км/ч."
+                } else {
+                    "Скорость не распознана. Возможны NO DATA, неподдерживаемый PID или ответ другого формата."
+                }
+            }
+            "03" -> {
+                if (response.contains("NO DATA", ignoreCase = true) || response.isBlank()) {
+                    "ЭБУ не вернул коды ошибок в стандартном режиме 03. Это ещё не означает, что ошибок нет в блоках Renault."
+                } else {
+                    "Получен сырой ответ режима чтения кодов неисправностей. Автоматическая расшифровка будет добавлена после проверки форматов ответов."
+                }
+            }
+            else -> "Получен ответ: \${response.ifBlank { "(нет ответа)" }}"
         }
     }
 
