@@ -16,7 +16,7 @@ Android application prototype for Renault diagnostics. The current development b
 
 ## Not implemented yet
 
-This prototype is **not yet a complete DDT4ALL port**. Renault-specific ECU identification and sessions, Renault ECU fault-code decoding, live Renault parameters, ECU configuration, actuator tests, and PIN extraction are not implemented. Standard OBD-II read-only requests are experimental and depend on ECU support.
+This prototype is **not yet a complete DDT4ALL port**. Renault-specific ECU identification and sessions, Renault ECU fault-code decoding, live Renault parameters, ECU configuration, actuator tests, and PIN extraction are not implemented. Standard OBD-II read-only requests are experimental and depend on ECU support. Negative KWP/OBD responses are displayed with their response code; a positive Mode 03 response containing only zero bytes is reported as no non-zero standard DTCs in that response, not as proof that all vehicle modules are fault-free.
 
 ## Safety
 
