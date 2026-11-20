@@ -165,26 +165,55 @@ class MainActivity : Activity() {
                 .bufferedReader(Charsets.UTF_8).use { it.readText() }
             val profile = JSONObject(jsonText)
             val vehicle = profile.getJSONObject("vehicle")
-            val connector = profile.getJSONObject("connector")
-            val candidates = profile.getJSONArray("ecuCandidates")
+            val networks = profile.getJSONArray("networks")
+            val groups = profile.getJSONArray("ecuGroups")
+            val sessions = profile.getJSONObject("sessions")
             val details = StringBuilder()
-            details.append("Профиль: ${vehicle.getString("name")}\n")
-            details.append("TCOM ${vehicle.getString("tcom")} • тип ${vehicle.getString("vehicleTypeCode")}\n")
-            details.append("Диагностическая линия: ${connector.getString("network")}\n")
-            details.append("K-Line: контакт ${connector.getInt("kLinePin")}; L-Line: контакт ${connector.getInt("lLinePin")}\n\n")
-            details.append("Варианты блоков из базы (это не результат сканирования):\n\n")
 
-            for (index in 0 until candidates.length()) {
-                val ecu = candidates.getJSONObject(index)
-                details.append(ecu.getString("system")).append(":\n")
-                val variants = ecu.getJSONArray("variants")
-                for (variantIndex in 0 until variants.length()) {
-                    val variant = variants.getJSONObject(variantIndex)
-                    details.append("• ${variant.getString("ecuId")} — ${variant.getString("description")}\n")
+            details.append("Профиль: ${vehicle.getString("name")}\\n")
+            details.append("TCOM ${vehicle.getString("tcom")} • тип ${vehicle.getString("vehicleTypeCode")}\\n")
+            details.append("Топология: ${vehicle.getInt("topologyIndex")}\\n\\n")
+            details.append("СЕТИ И КОНТАКТЫ OBD:\\n")
+            for (i in 0 until networks.length()) {
+                val network = networks.getJSONObject(i)
+                val pins = network.getJSONObject("pins")
+                details.append(network.getString("type")).append(" (сеть ${network.getInt("index")}): ")
+                val pinNames = pins.keys()
+                val pinText = ArrayList<String>()
+                while (pinNames.hasNext()) {
+                    val key = pinNames.next()
+                    pinText.add("$" + key + "=" + pins.getInt(key))
                 }
-                details.append("\n")
+                details.append(pinText.joinToString(", ")).append("\\n")
             }
-            details.append("Фактически установленные блоки пока не определены. Следующий этап — безопасная идентификация каждого ЭБУ.")
+            details.append("\\nКАНДИДАТЫ ЭБУ ИЗ TCOM (НЕ РЕЗУЛЬТАТ СКАНИРОВАНИЯ):\\n")
+            for (i in 0 until groups.length()) {
+                val group = groups.getJSONObject(i)
+                details.append("\\n").append(group.getString("system"))
+                    .append(" [сеть ${group.getInt("networkIndex")}]:\\n")
+                val ecus = group.getJSONArray("ecus")
+                for (j in 0 until ecus.length()) {
+                    val ecu = ecus.getJSONObject(j)
+                    details.append("• ${ecu.getString("id")}")
+                    val doc = ecu.optString("doc")
+                    if (doc.isNotBlank()) details.append(" — ").append(doc)
+                    details.append("\\n")
+                }
+            }
+            details.append("\\nОПИСАНИЯ ДИАГНОСТИЧЕСКИХ СЕАНСОВ В АРХИВЕ:\\n")
+            val sessionKeys = sessions.keys()
+            while (sessionKeys.hasNext()) {
+                val id = sessionKeys.next()
+                val session = sessions.getJSONObject(id)
+                details.append("\\nЭБУ $").append(id).append(" — ").append(session.getString("databaseName")).append("\\n")
+                details.append("Идентификации: ").append(session.getInt("identifications"))
+                details.append("; состояния: ").append(session.getInt("states"))
+                details.append("; параметры: ").append(session.getInt("parameters"))
+                details.append("; команды: ").append(session.getInt("commands")).append("\\n")
+                details.append("Файл: ").append(session.getString("file")).append("\\n")
+            }
+            details.append("\\nВАЖНО: эти варианты взяты из базы TCOM 116. Наличие блока в списке не подтверждает, что он установлен в автомобиле. XML описывает названия и структуру диагностических данных; проверенная процедура связи ещё разрабатывается. Запись конфигураций и исполнительные тесты отключены.")
+
             AlertDialog.Builder(this)
                 .setTitle("База Renault — Laguna II")
                 .setMessage(details.toString())
