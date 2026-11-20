@@ -1,0 +1,54 @@
+{
+  "profileId": "renault_laguna_ii_tcom_116",
+  "source": "User-provided pyrendata archive, Vehicles/TCOM_116.xml",
+  "vehicle": {
+    "name": "Renault Laguna II",
+    "tcom": "116",
+    "vehicleTypeCode": "X74X",
+    "topologyIndex": 14
+  },
+  "connector": {
+    "name": "OBD",
+    "network": "ISO/K-Line",
+    "networkIndex": 1,
+    "kLinePin": 7,
+    "lLinePin": 15
+  },
+  "ecuCandidates": [
+    {
+      "system": "Двигатель / впрыск",
+      "familyId": 1,
+      "variants": [
+        {"ecuId": "10192", "description": "EDC15C 00C3 0C"},
+        {"ecuId": "10194", "description": "EDC15C 74 Phase 1 9BC1 10"}
+      ],
+      "sessionFiles": ["FG0110192.xml"],
+      "status": "candidate_not_confirmed"
+    },
+    {
+      "system": "ABS",
+      "familyId": 2,
+      "variants": [
+        {"ecuId": "10175", "description": "BMK X74 0000 0C"},
+        {"ecuId": "10177", "description": "BMK X74 0F08 08"}
+      ],
+      "sessionFiles": ["FG0210175.xml"],
+      "status": "candidate_not_confirmed"
+    },
+    {
+      "system": "UCH",
+      "familyId": 4,
+      "variants": [
+        {"ecuId": "10247", "description": "BUCH74 0090 04"},
+        {"ecuId": "10248", "description": "BUCH74 0090 0C"}
+      ],
+      "sessionFiles": ["FG0410247.xml"],
+      "status": "candidate_not_confirmed"
+    }
+  ],
+  "safety": {
+    "communicationImplemented": false,
+    "readOnlyOnly": true,
+    "note": "TCOM profile lists possible ECU variants. It does not prove which ECU is installed in this specific vehicle."
+  }
+}
