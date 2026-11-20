@@ -168,21 +168,21 @@ class MainActivity : Activity() {
             val connector = profile.getJSONObject("connector")
             val candidates = profile.getJSONArray("ecuCandidates")
             val details = StringBuilder()
-            details.append("Профиль: ${vehicle.getString("name")}\\n")
-            details.append("TCOM ${vehicle.getString("tcom")} • тип ${vehicle.getString("vehicleTypeCode")}\\n")
-            details.append("Диагностическая линия: ${connector.getString("network")}\\n")
-            details.append("K-Line: контакт ${connector.getInt("kLinePin")}; L-Line: контакт ${connector.getInt("lLinePin")}\\n\\n")
-            details.append("Варианты блоков из базы (это не результат сканирования):\\n\\n")
+            details.append("Профиль: ${vehicle.getString("name")}\n")
+            details.append("TCOM ${vehicle.getString("tcom")} • тип ${vehicle.getString("vehicleTypeCode")}\n")
+            details.append("Диагностическая линия: ${connector.getString("network")}\n")
+            details.append("K-Line: контакт ${connector.getInt("kLinePin")}; L-Line: контакт ${connector.getInt("lLinePin")}\n\n")
+            details.append("Варианты блоков из базы (это не результат сканирования):\n\n")
 
             for (index in 0 until candidates.length()) {
                 val ecu = candidates.getJSONObject(index)
-                details.append(ecu.getString("system")).append(":\\n")
+                details.append(ecu.getString("system")).append(":\n")
                 val variants = ecu.getJSONArray("variants")
                 for (variantIndex in 0 until variants.length()) {
                     val variant = variants.getJSONObject(variantIndex)
-                    details.append("• ${variant.getString("ecuId")} — ${variant.getString("description")}\\n")
+                    details.append("• ${variant.getString("ecuId")} — ${variant.getString("description")}\n")
                 }
-                details.append("\\n")
+                details.append("\n")
             }
             details.append("Фактически установленные блоки пока не определены. Следующий этап — безопасная идентификация каждого ЭБУ.")
             AlertDialog.Builder(this)
