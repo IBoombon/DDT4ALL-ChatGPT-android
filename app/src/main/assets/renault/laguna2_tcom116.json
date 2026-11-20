@@ -1,54 +1,38 @@
 {
   "profileId": "renault_laguna_ii_tcom_116",
-  "source": "User-provided pyrendata archive, Vehicles/TCOM_116.xml",
-  "vehicle": {
-    "name": "Renault Laguna II",
-    "tcom": "116",
-    "vehicleTypeCode": "X74X",
-    "topologyIndex": 14
-  },
-  "connector": {
-    "name": "OBD",
-    "network": "ISO/K-Line",
-    "networkIndex": 1,
-    "kLinePin": 7,
-    "lLinePin": 15
-  },
-  "ecuCandidates": [
-    {
-      "system": "Двигатель / впрыск",
-      "familyId": 1,
-      "variants": [
-        {"ecuId": "10192", "description": "EDC15C 00C3 0C"},
-        {"ecuId": "10194", "description": "EDC15C 74 Phase 1 9BC1 10"}
-      ],
-      "sessionFiles": ["FG0110192.xml"],
-      "status": "candidate_not_confirmed"
-    },
-    {
-      "system": "ABS",
-      "familyId": 2,
-      "variants": [
-        {"ecuId": "10175", "description": "BMK X74 0000 0C"},
-        {"ecuId": "10177", "description": "BMK X74 0F08 08"}
-      ],
-      "sessionFiles": ["FG0210175.xml"],
-      "status": "candidate_not_confirmed"
-    },
-    {
-      "system": "UCH",
-      "familyId": 4,
-      "variants": [
-        {"ecuId": "10247", "description": "BUCH74 0090 04"},
-        {"ecuId": "10248", "description": "BUCH74 0090 0C"}
-      ],
-      "sessionFiles": ["FG0410247.xml"],
-      "status": "candidate_not_confirmed"
-    }
+  "source": "User archive: Vehicles/TCOM_116.xml and EcuRenault/Sessions/FG0110192.xml, FG0210175.xml, FG0410247.xml",
+  "vehicle": {"name":"LAGUNA II","tcom":"116","vehicleTypeCode":"X74X","topologyIndex":14},
+  "networks": [
+    {"type":"CAN","index":0,"pins":{"CAN_H":6,"CAN_L":14}},
+    {"type":"ISO/K-Line","index":1,"pins":{"K":7,"L":15}}
   ],
-  "safety": {
-    "communicationImplemented": false,
-    "readOnlyOnly": true,
-    "note": "TCOM profile lists possible ECU variants. It does not prove which ECU is installed in this specific vehicle."
-  }
+  "ecuGroups": [
+    {"networkIndex":1,"familyId":1,"system":"Впрыск / двигатель","ecus":[
+      {"id":"10183","doc":"INJ_STURBO_A560_02_A"},{"id":"10192","doc":"INJ_EDC15C_00C3_0C_A"},{"id":"10194","doc":"INJ_EDC15C_74Ph1_9BC1_10_A"},{"id":"10199","doc":"INJ_SIRI35_0E06_04_A"},{"id":"10202","doc":"INJ_S2000__00A3_08_A"},{"id":"10203","doc":"INJ_S2000__00A3_0C_A"},{"id":"10204","doc":"INJ_ME746__0012_04_A"},{"id":"10303","doc":"EDC 15C - Vdiag 14 VA2 - IMA B2"},{"id":"10304","doc":"INJ_EDC15_CBB0_18_A"},{"id":"10305","doc":"INJ_EDC15__CBB2_18_A"},{"id":"10341","doc":""},{"id":"10342","doc":""},{"id":"10343","doc":""}]},
+    {"networkIndex":1,"familyId":2,"system":"ABS","ecus":[
+      {"id":"10175","doc":"ABS_BMKX74_0000_0C_A"},{"id":"10177","doc":"ABS_BMKX74_0F08_08_A"}]},
+    {"networkIndex":0,"familyId":3,"system":"Приборная панель / CAN","ecus":[
+      {"id":"10109","doc":"TDB_74PHA2_004A_11_A"}]},
+    {"networkIndex":1,"familyId":3,"system":"Приборная панель / ISO","ecus":[
+      {"id":"10119","doc":"TDB_BNEW74_0007_04_A"},{"id":"10120","doc":"TDB_BNEW74_0008_16_A"},{"id":"10121","doc":"TDB_BTBD74_0001_04_A"},{"id":"10145","doc":""}]},
+    {"networkIndex":1,"familyId":4,"system":"UCH","ecus":[
+      {"id":"10247","doc":"UCH_BUCH74_0090_04_A"},{"id":"10248","doc":"UCH_BUCH74_0090_0C_A"}]},
+    {"networkIndex":1,"familyId":5,"system":"Подушки безопасности","ecus":[
+      {"id":"10152","doc":"ABG_BX7374_000F_24_A"},{"id":"10166","doc":"ABG_BX7473_000F_14_A"},{"id":"10167","doc":"ABG_BACU74_000F_0C_A"},{"id":"10251","doc":"ABG_BX7374_000F_2C_A"}]},
+    {"networkIndex":1,"familyId":8,"system":"Климатическая система","ecus":[
+      {"id":"10136","doc":"CLI_BBAC74_0001_05_A"},{"id":"10165","doc":"CLI_BREG74_0001_04_A"},{"id":"10186","doc":"CLI_BNEW74_0001_09_A"},{"id":"10188","doc":"CLI_74MAN2_0002_08_A"}]},
+    {"networkIndex":1,"familyId":9,"system":"Автоматическая коробка передач","ecus":[
+      {"id":"10111","doc":"BVA_BSU1AP_0450_04_A"},{"id":"10125","doc":"BVA_BSU001_0450_08_A"},{"id":"10146","doc":""},{"id":"10168","doc":"BVA_BDP0TA_0001_00_A"}]},
+    {"networkIndex":1,"familyId":12,"system":"Система нейтрализации NOx","ecus":[{"id":"10184","doc":"NJG_BGPL2K_A850_04_A"}]},
+    {"networkIndex":1,"familyId":52,"system":"Корректор фар","ecus":[
+      {"id":"10038","doc":"LAD_J84APV_0101_05_A"},{"id":"10113","doc":"LAD_BORN74_0000_00_A"}]},
+    {"networkIndex":1,"familyId":55,"system":"Усилитель рулевого управления","ecus":[{"id":"10170","doc":"AAP_BP7381_0001_04_A"}]},
+    {"networkIndex":1,"familyId":56,"system":"Система зарядки","ecus":[{"id":"10190","doc":"CHA_BHEA02_0001_04_A"}]}
+  ],
+  "sessions": {
+    "10192":{"file":"FG0110192.xml","databaseName":"INJECTION EDC15-00 C3-0C","identifications":18,"states":39,"parameters":83,"defaults":45,"commands":20},
+    "10175":{"file":"FG0210175.xml","databaseName":"ABS-F.008-0C","identifications":11,"states":11,"parameters":15,"defaults":63,"commands":28},
+    "10247":{"file":"FG0410247.xml","databaseName":"UCH-90-04","identifications":18,"states":125,"parameters":46,"defaults":48,"commands":78}
+  },
+  "notice":"These are candidate ECU references from TCOM 116, not detected modules. CAN and ISO/K-Line networks are both defined in the source. The session XML files contain diagnostic labels/data definitions but do not alone provide a verified initialization and request sequence. No ECU communication or write operations are implemented."
 }
