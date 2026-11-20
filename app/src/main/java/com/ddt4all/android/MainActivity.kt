@@ -19,6 +19,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
+import org.json.JSONObject
 import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
@@ -74,6 +75,11 @@ class MainActivity : Activity() {
             setPadding(0, 12, 0, 16)
         }
 
+        val profileButton = Button(this).apply {
+            text = "БАЗА ЭБУ LAGUNA II (TCOM 116)"
+            setOnClickListener { showLagunaProfile() }
+        }
+
         connectButton = Button(this).apply {
             text = "Подключить ELM327"
             setOnClickListener { requestBluetoothPermissionAndChooseDevice() }
@@ -115,6 +121,7 @@ class MainActivity : Activity() {
         content.addView(title)
         content.addView(subtitle)
         content.addView(status)
+        content.addView(profileButton, matchWrap())
         content.addView(connectButton, matchWrap())
         content.addView(disconnectButton, matchWrap())
         content.addView(testButton, matchWrap())
@@ -150,6 +157,42 @@ class MainActivity : Activity() {
             addView(content)
         }
         setContentView(scroll)
+    }
+
+    private fun showLagunaProfile() {
+        try {
+            val jsonText = assets.open("renault/laguna2_tcom116.json")
+                .bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val profile = JSONObject(jsonText)
+            val vehicle = profile.getJSONObject("vehicle")
+            val connector = profile.getJSONObject("connector")
+            val candidates = profile.getJSONArray("ecuCandidates")
+            val details = StringBuilder()
+            details.append("Профиль: ${vehicle.getString("name")}\\n")
+            details.append("TCOM ${vehicle.getString("tcom")} • тип ${vehicle.getString("vehicleTypeCode")}\\n")
+            details.append("Диагностическая линия: ${connector.getString("network")}\\n")
+            details.append("K-Line: контакт ${connector.getInt("kLinePin")}; L-Line: контакт ${connector.getInt("lLinePin")}\\n\\n")
+            details.append("Варианты блоков из базы (это не результат сканирования):\\n\\n")
+
+            for (index in 0 until candidates.length()) {
+                val ecu = candidates.getJSONObject(index)
+                details.append(ecu.getString("system")).append(":\\n")
+                val variants = ecu.getJSONArray("variants")
+                for (variantIndex in 0 until variants.length()) {
+                    val variant = variants.getJSONObject(variantIndex)
+                    details.append("• ${variant.getString("ecuId")} — ${variant.getString("description")}\\n")
+                }
+                details.append("\\n")
+            }
+            details.append("Фактически установленные блоки пока не определены. Следующий этап — безопасная идентификация каждого ЭБУ.")
+            AlertDialog.Builder(this)
+                .setTitle("База Renault — Laguna II")
+                .setMessage(details.toString())
+                .setPositiveButton("Закрыть", null)
+                .show()
+        } catch (e: Exception) {
+            appendLog("Не удалось открыть профиль Laguna II: ${e.message}")
+        }
     }
 
     private fun matchWrap() = LinearLayout.LayoutParams(
