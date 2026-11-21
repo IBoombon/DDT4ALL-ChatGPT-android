@@ -31,6 +31,8 @@ XML encodings are mixed: UTF-16LE BOM (127 files), UTF-8 BOM (82 files), and no 
 
 The sampled `.p` files are valid Python Pickle protocol 2 streams. They must not be treated as XML or plain text.
 
+All 1,216 `.p` files were opcode-checked successfully: 1,215 use Pickle protocol 2 and one legacy file (`EcuRenault/Sessions/SG0110102.p`) uses the older protocol-0 form. The common opcode patterns are dictionary construction and string key/value insertion; no file failed the opcode parser.
+
 Two observed shapes:
 
 - `Location/DiagOnCAN_GB.p`: a dictionary of string keys and string values, including localization/diagnostic text identifiers such as `C3P_33`, `ABS`, `1006`, and English text.
