@@ -123,6 +123,26 @@ class MainActivity : Activity() {
             text = "Чтение кодов ошибок (03)"
             setOnClickListener { runReadOnlyCommand("Коды ошибок (режим 03)", "03") }
         }
+        val coolantButton = Button(this).apply {
+            text = "Температура охлаждающей жидкости (0105)"
+            setOnClickListener { runReadOnlyCommand("Температура ОЖ", "0105") }
+        }
+        val intakeTempButton = Button(this).apply {
+            text = "Температура воздуха на впуске (010F)"
+            setOnClickListener { runReadOnlyCommand("Температура воздуха", "010F") }
+        }
+        val throttleButton = Button(this).apply {
+            text = "Положение дросселя (0111)"
+            setOnClickListener { runReadOnlyCommand("Положение дросселя", "0111") }
+        }
+        val mafButton = Button(this).apply {
+            text = "Расход воздуха MAF (0110)"
+            setOnClickListener { runReadOnlyCommand("Расход воздуха MAF", "0110") }
+        }
+        val voltageButton = Button(this).apply {
+            text = "Напряжение блока управления (0142)"
+            setOnClickListener { runReadOnlyCommand("Напряжение блока", "0142") }
+        }
 
         logView = TextView(this).apply {
             text = "Журнал обмена с адаптером появится здесь."
@@ -145,6 +165,11 @@ class MainActivity : Activity() {
         content.addView(rpmButton, matchWrap())
         content.addView(speedButton, matchWrap())
         content.addView(dtcButton, matchWrap())
+        content.addView(coolantButton, matchWrap())
+        content.addView(intakeTempButton, matchWrap())
+        content.addView(throttleButton, matchWrap())
+        content.addView(mafButton, matchWrap())
+        content.addView(voltageButton, matchWrap())
 
         val futureFeatures = listOf(
             "Идентификация ЭБУ",
@@ -452,6 +477,20 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun decodePid(data: String, prefix: String, label: String, convert: (Int) -> String): String {
+        val match = Regex(prefix + "([0-9A-F]{2})").find(data)
+        return if (match == null) "$label: ответ не распознан или PID не поддерживается."
+        else "$label: ${convert(match.groupValues[1].toInt(16))}."
+    }
+
+    private fun decodeObdDtc(hex: String): String {
+        val a = hex.substring(0, 2).toInt(16)
+        val b = hex.substring(2, 4).toInt(16)
+        val family = when ((a shr 6) and 0x03) { 0 -> "P"; 1 -> "C"; 2 -> "B"; else -> "U" }
+        val digit = (a shr 4) and 0x03
+        return family + digit + "%02X".format(java.util.Locale.US, a and 0x0F) + "%02X".format(java.util.Locale.US, b)
+    }
+
     private fun formatReadOnlyResult(command: String, response: String): String {
         val compact = response.uppercase().replace(Regex("[^0-9A-F]"), "")
         val negative = Regex("7F([0-9A-F]{2})([0-9A-F]{2})").find(compact)
@@ -509,18 +548,27 @@ class MainActivity : Activity() {
                 }
             }
             "03" -> {
-                if (response.contains("NO DATA", ignoreCase = true) || response.isBlank()) {
-                    "ЭБУ не вернул коды ошибок в стандартном режиме 03. Это не означает, что ошибок нет в блоках Renault."
+                val data = Regex("43([0-9A-F]+)").find(compact)?.groupValues?.get(1)
+                if (data == null) {
+                    "ЭБУ не вернул распознаваемые коды в стандартном режиме 03. Это не означает, что ошибок нет в блоках Renault."
                 } else {
-                    val data = Regex("43([0-9A-F]+)").find(compact)?.groupValues?.get(1)
-                    if (data != null && data.all { it == '0' }) {
-                        "Положительный ответ 43 получен, ненулевые стандартные DTC в ответе не обнаружены. Диагностика других блоков Renault не выполнена."
-                    } else if (data != null) {
-                        "Получены данные стандартных кодов неисправностей (сырой блок: $data). Расшифровка кодов будет добавлена отдельно."
-                    } else {
-                        "Получен ответ режима чтения кодов неисправностей, но его формат не распознан. Сохрани сырой ответ."
-                    }
+                    val codes = data.chunked(4).filter { it.length == 4 && it != "0000" }.map { decodeObdDtc(it) }
+                    if (codes.isEmpty()) "Положительный ответ 43: ненулевые стандартные DTC в ответе не обнаружены. Блоки Renault отдельно не опрошены."
+                    else "Стандартные коды OBD-II: " + codes.joinToString(", ")
                 }
+            }
+            "0105" -> decodePid(compact, "4105", "Температура охлаждающей жидкости") { b -> "${b - 40} °C" }
+            "010F" -> decodePid(compact, "410F", "Температура воздуха на впуске") { b -> "${b - 40} °C" }
+            "0111" -> decodePid(compact, "4111", "Положение дросселя") { b -> "${"%.1f".format(java.util.Locale.US, b * 100.0 / 255.0)} %" }
+            "0110" -> {
+                val m = Regex("4110([0-9A-F]{4})").find(compact)
+                if (m == null) "Ответ MAF не распознан или PID не поддерживается."
+                else "${((m.groupValues[1].substring(0,2).toInt(16)*256 + m.groupValues[1].substring(2,4).toInt(16))/100.0)} г/с"
+            }
+            "0142" -> {
+                val m = Regex("4142([0-9A-F]{4})").find(compact)
+                if (m == null) "Ответ напряжения блока не распознан или PID не поддерживается."
+                else "${((m.groupValues[1].toInt(16))/1000.0)} В"
             }
             else -> "Получен ответ: ${response.ifBlank { "(нет ответа)" }}"
         }
