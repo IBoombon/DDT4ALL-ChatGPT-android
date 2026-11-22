@@ -7,6 +7,8 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.pm.PackageManager
+import android.content.Intent
+import android.net.Uri
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -16,6 +18,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import java.io.IOException
+import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
@@ -26,6 +29,7 @@ class MainActivity : Activity() {
 
     companion object {
         private const val REQUEST_BLUETOOTH_CONNECT = 1001
+        private const val REQUEST_RENAULT_PACK = 1002
         private val SPP_UUID: UUID =
             UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     }
@@ -35,6 +39,7 @@ class MainActivity : Activity() {
     private var output: OutputStream? = null
     private var connectedDeviceName: String? = null
     private val elmCommandLock = Any()
+    private val renaultDataPack by lazy { RenaultDataPack(this) }
 
     private lateinit var status: TextView
     private lateinit var logView: TextView
@@ -80,6 +85,15 @@ class MainActivity : Activity() {
             setOnClickListener { showLagunaProfile() }
         }
 
+        val importPackButton = Button(this).apply {
+            text = "ИМПОРТИРОВАТЬ БАЗУ LAGUNA II (ZIP)"
+            setOnClickListener { chooseRenaultPack() }
+        }
+        val importedDbButton = Button(this).apply {
+            text = "ОТКРЫТЬ ДИАГНОСТИЧЕСКИЕ СЕАНСЫ TCOM 116"
+            setOnClickListener { showImportedLagunaPack() }
+        }
+
         connectButton = Button(this).apply {
             text = "Подключить ELM327"
             setOnClickListener { requestBluetoothPermissionAndChooseDevice() }
@@ -122,6 +136,8 @@ class MainActivity : Activity() {
         content.addView(subtitle)
         content.addView(status)
         content.addView(profileButton, matchWrap())
+        content.addView(importPackButton, matchWrap())
+        content.addView(importedDbButton, matchWrap())
         content.addView(connectButton, matchWrap())
         content.addView(disconnectButton, matchWrap())
         content.addView(testButton, matchWrap())
@@ -159,6 +175,59 @@ class MainActivity : Activity() {
         setContentView(scroll)
     }
 
+    private fun chooseRenaultPack() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/zip"
+        }
+        startActivityForResult(intent, REQUEST_RENAULT_PACK)
+    }
+
+    @Deprecated("Deprecated API retained for compatibility without AndroidX")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_RENAULT_PACK || resultCode != RESULT_OK) return
+        val uri: Uri = data?.data ?: return
+        thread(name = "renault-pack-import") {
+            try {
+                val temp = File(cacheDir, "renault-import.zip")
+                contentResolver.openInputStream(uri)?.use { input -> temp.outputStream().use { input.copyTo(it) } }
+                    ?: throw IOException("Не удалось открыть выбранный файл")
+                val saved = renaultDataPack.importPack(temp)
+                val profile = renaultDataPack.readProfile(saved)
+                runOnUiThread {
+                    appendLog("База Renault импортирована: TCOM ${profile.tcom}, ЭБУ: ${profile.ecus.size}.")
+                    AlertDialog.Builder(this)
+                        .setTitle("База Laguna II импортирована")
+                        .setMessage("Профиль ${profile.label}\nTCOM ${profile.tcom} • тип ${profile.vehicleType} • топология ${profile.topology}\nВариантов ЭБУ: ${profile.ecus.size}\n\nЭто справочные варианты из базы, а не результат сканирования автомобиля.")
+                        .setPositiveButton("Открыть ЭБУ") { _, _ -> showImportedLagunaPack() }
+                        .setNegativeButton("Закрыть", null)
+                        .show()
+                }
+            } catch (e: Exception) { runOnUiThread { appendLog("Ошибка импорта базы Renault: ${e.message}") } }
+        }
+    }
+
+    private fun showImportedLagunaPack() {
+        val pack = File(filesDir, "renault-laguna2-tcom116.zip")
+        try {
+            val profile = renaultDataPack.readProfile(pack)
+            val labels = profile.ecus.map { "${it.ecuId} — ${it.label}" }.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("TCOM ${profile.tcom}: выберите вариант ЭБУ")
+                .setItems(labels) { _, which ->
+                    val ecu = profile.ecus[which]
+                    thread(name = "renault-session-read") {
+                        try {
+                            val details = renaultDataPack.describeEcu(pack, ecu)
+                            runOnUiThread { AlertDialog.Builder(this).setTitle("ЭБУ ${ecu.ecuId}").setMessage(details).setPositiveButton("Закрыть", null).show() }
+                        } catch (e: Exception) { runOnUiThread { appendLog("Ошибка чтения диагностического сеанса: ${e.message}") } }
+                    }
+                }
+                .setNegativeButton("Закрыть", null)
+                .show()
+        } catch (e: Exception) { appendLog("База ещё не импортирована. Выберите ZIP через кнопку импорта. Причина: ${e.message}") }
+    }
     private fun showLagunaProfile() {
         try {
             val jsonText = assets.open("renault/laguna2_tcom116.json")
