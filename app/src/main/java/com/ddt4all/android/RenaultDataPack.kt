@@ -21,7 +21,7 @@ class RenaultDataPack(private val context: Context) {
             require(manifest.optString("format") == "renault-laguna2-pack-v1") { "Неподдерживаемый формат базы" }
             require(manifest.optInt("tcom") == 116) { "Сейчас поддерживается пакет TCOM 116" }
             val report = readJson(zip, "conversion-report.json")
-            require(report.optInt("rejectedPickleFiles") == 0) { "В пакете есть непреобразованные .p; импорт остановлен" }
+            require(report.optJSONArray("rejectedPickleFiles")?.length() == 0) { "В пакете есть непреобразованные .p; импорт остановлен" }
         }
         val target = File(context.filesDir, "renault-laguna2-tcom116.zip")
         source.copyTo(target, overwrite = true)
