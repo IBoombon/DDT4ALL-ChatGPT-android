@@ -127,9 +127,31 @@ def main():
                 optimizer = xml_text(definition, "OptimizerId")
                 model_path = find_session(model, ["xml"])
                 optimizer_path = find_session(optimizer, ["p", "xml"])
+                info = definition.find("ECUInformations")
+                def info_value(name):
+                    node = info.find(name) if info is not None else None
+                    return node.get("value") if node is not None else None
+                frames = info.find("Frames") if info is not None else None
+                apc = frames.find("APC") if frames is not None else None
+                ids = info.find("Ids") if info is not None else None
+                id_frame = ids.find("IdFrame") if ids is not None else None
+                id_byte = ids.find("IdByte") if ids is not None else None
                 item = {"familyId": kind.get("idFamily"), "ecuId": ecu_id,
                         "doc": ref.get("doc"), "stdType": definition.get("stdType"),
-                        "modelPath": model_path, "optimizerPath": optimizer_path}
+                        "modelPath": model_path, "optimizerPath": optimizer_path,
+                        "protocol": info_value("Protocol"), "baudRate": info_value("BaudRate"),
+                        "fastInitAddress": info_value("FastInitAddress"),
+                        "slowInitAddress": info_value("SlowInitAddress"),
+                        "kw1": info_value("KW1"), "kw2": info_value("KW2"),
+                        "apcRequest": apc.get("request") if apc is not None else None,
+                        "apcResponse": apc.get("response") if apc is not None else None,
+                        "identificationRequest": id_frame.get("request") if id_frame is not None else None,
+                        "identificationResponse": id_frame.get("response") if id_frame is not None else None,
+                        "identificationLength": id_frame.get("length") if id_frame is not None else None,
+                        "identificationMode": id_frame.get("mode") if id_frame is not None else None,
+                        "identificationByteRank": id_byte.get("rank") if id_byte is not None else None,
+                        "identificationByteMask": id_byte.get("mask") if id_byte is not None else None,
+                        "identificationByteValue": id_byte.get("value") if id_byte is not None else None}
                 references.append(item)
                 if model_path:
                     selected.add(model_path)
