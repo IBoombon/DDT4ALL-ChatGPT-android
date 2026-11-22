@@ -9,7 +9,10 @@ Android application prototype for Renault diagnostics. The current development b
 - Requests the Android 12+ `BLUETOOTH_CONNECT` runtime permission.
 - Sends basic ELM327 initialization commands: `ATZ`, `ATE0`, `ATL0`, `ATS0`, `ATH0`, `ATSP0`.
 - Provides a manual OBD-II connectivity test using `0100`.
-- Includes read-only requests for adapter protocol identification (`ATDP`), engine RPM (`010C`), vehicle speed (`010D`), and standard stored diagnostic trouble codes (`03`).
+- Includes read-only requests for adapter protocol identification (`ATDP`), engine RPM (`010C`), vehicle speed (`010D`), coolant temperature (`0105`), intake-air temperature (`010F`), throttle position (`0111`), MAF (`0110`), control-module voltage (`0142`), and standard stored diagnostic trouble codes (`03`).
+- Decodes standard OBD-II DTC identifiers into P/C/B/U code families.
+- Displays XML catalog entries for ECU identifications, states, parameters, commands and fault interpretations.
+- Displays ECU communication metadata from `Uces.xml` (protocol label, baud rate, init addresses, keywords, and identification request/response) as reference data only.
 - Serializes initialization and diagnostic requests to prevent overlapping ELM327 transactions.
 - Shows decoded RPM and speed when the ECU returns standard OBD-II response frames; otherwise preserves the raw response in the log.
 - Displays adapter responses in an on-screen log.
@@ -18,7 +21,7 @@ Android application prototype for Renault diagnostics. The current development b
 
 ## Not implemented yet
 
-This prototype is **not yet a complete DDT4ALL port**. The new database browser reads profile/session metadata and counts XML diagnostic objects; it does not yet execute Renault ECU diagnostic services, decode Renault fault codes, read live Renault parameters, or perform ECU configuration, actuator tests, or PIN extraction. Standard OBD-II read-only requests are experimental and depend on ECU support. Negative KWP/OBD responses are displayed with their response code; a positive Mode 03 response containing only zero bytes is reported as no non-zero standard DTCs in that response, not as proof that all vehicle modules are fault-free.
+This prototype is **not yet a complete DDT4ALL port**. The database browser displays ECU session catalog entries and communication metadata, but does not yet execute Renault-specific ECU diagnostic services or read live Renault ECU parameters. Renault fault-code interpretation, ECU configuration, actuator tests, UCH/card programming and PIN extraction are not implemented. The added live parameters are generic OBD-II PIDs and depend on support by the connected ECU. Standard OBD-II read-only requests are experimental and depend on ECU support. Negative KWP/OBD responses are displayed with their response code; a positive Mode 03 response containing only zero bytes is reported as no non-zero standard DTCs in that response, not as proof that all vehicle modules are fault-free.
 
 ## Safety
 
