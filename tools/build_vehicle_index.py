@@ -39,6 +39,23 @@ def main() -> None:
         uces_root = xml_from_zip(zf, uces_path)
         uces = {e.get("name"): e for e in uces_root.findall("EcuData") if e.get("name")}
 
+        by_lower = {n.lower(): n for n in names}
+
+        def resolve_session(reference: str | None, optimizer: bool = False) -> str | None:
+            if not reference:
+                return None
+            base = "EcuRenault/Sessions/" + reference
+            candidates = [base]
+            if optimizer:
+                candidates.extend([base[:-4] + ".p", base[:-4] + ".xml"])
+            else:
+                candidates.extend([base[:-4] + ".xml", base[:-4] + ".XML"])
+            for candidate in candidates:
+                found = by_lower.get(candidate.lower())
+                if found:
+                    return found
+            return None
+
         profiles = []
         for path in names:
             match = re.fullmatch(r"Vehicles/TCOM_(\d+)\.xml", path, re.IGNORECASE)
@@ -63,8 +80,8 @@ def main() -> None:
                         "std_type": definition.get("stdType") if definition is not None else None,
                         "model_file": model,
                         "optimizer_file": optimizer,
-                        "model_path": f"EcuRenault/Sessions/{model}" if model else None,
-                        "optimizer_path": f"EcuRenault/Sessions/{optimizer}" if optimizer else None,
+                        "model_path": resolve_session(model),
+                        "optimizer_path": resolve_session(optimizer, optimizer=True),
                     })
             profiles.append({
                 "tcom": int(match.group(1)),
