@@ -63,3 +63,31 @@ TCOM 121 is a separate Laguna II Phase 2 profile and has a different topology an
 ## Current status
 
 This commit records the archive format audit only. It does not claim that the archive has been integrated into the APK or that vehicle-specific Renault diagnostics are operational.
+
+
+## Vehicle-to-ECU indexer (implemented)
+
+A first reproducible indexing tool now exists at `tools/build_vehicle_index.py` on branch `feature/bluetooth-elm327`.
+
+- It reads vehicle profile XML and `EcuRenault/Uces.xml`, then emits a compact JSON index.
+- It records TCOM profile identity, ECU family, ECU ID, vehicle-side document label, matching Uces entry, model XML path, and optimizer resource path.
+- It resolves references against actual archive member names. This matters because model references may say `.XML` while the archive stores `.xml`, and optimizer references may say `.XML` while the resource is actually a `.p` file.
+- It does not deserialize Pickle. Optimizer resources are indexed as paths only.
+- Usage: `python tools/build_vehicle_index.py archive.zip --output vehicle-index.json`.
+
+### Directly checked Laguna profile links
+
+For TCOM 116, the profile contains 39 ECU references; 34 have matching entries in `Uces.xml`. The database links include:
+
+| Family | ECU ID | Profile document | Uces model | Optimizer resource |
+|---|---:|---|---|---|
+| 1 (injection) | 10192 | INJ_EDC15C_00C3_0C_A | FG0110192.xml | SG0110192.p |
+| 1 (injection) | 10194 | INJ_EDC15C_74Ph1_9BC1_10_A | FG0110194.xml | SG0110194.p |
+| 2 (ABS) | 10175 | ABS_BMKX74_0000_0C_A | FG0210175.xml | SG0210175.p |
+| 2 (ABS) | 10177 | ABS_BMKX74_0F08_08_A | FG0210177.xml | SG0210177.p |
+| 4 (UCH) | 10247 | UCH_BUCH74_0090_04_A | FG0410247.xml | SG0410247.p |
+| 4 (UCH) | 10248 | UCH_BUCH74_0090_0C_A | FG0410248.xml | SG0410248.p |
+
+TCOM 121 has 38 ECU references, 32 linked to `Uces.xml`. In the inspected data it shares UCH candidate IDs 10247/10248 with TCOM 116, but has a different topology/profile identity. This is database linkage only, not confirmation that any one of these ECUs is fitted to the user's car.
+
+The indexer is a first data-processing step, not yet Android integration. No live ECU session, UCH service, card registration, PIN extraction, or write operation is enabled by this change.
