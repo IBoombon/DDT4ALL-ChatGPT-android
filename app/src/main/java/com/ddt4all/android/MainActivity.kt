@@ -492,85 +492,86 @@ class MainActivity : Activity() {
     }
 
     private fun formatReadOnlyResult(command: String, response: String): String {
-        val compact = response.uppercase().replace(Regex("[^0-9A-F]"), "")
+        // Classify ELM327 transport/status text before removing non-hex characters.
+        // Otherwise words such as NO DATA or CAN ERROR become meaningless hex fragments.
+        val raw = response.trim()
+        val upper = raw.uppercase(java.util.Locale.US)
+        if (raw.isBlank()) return "Таймаут: адаптер не прислал ответ. Это не подтверждает отказ ЭБУ."
+        if (upper.contains("UNABLE TO CONNECT")) return "Ошибка связи: ELM327 не смог установить связь с блоком (UNABLE TO CONNECT)."
+        if (upper.contains("CAN ERROR")) return "Ошибка шины CAN, а не положительный ответ ЭБУ."
+        if (upper.contains("BUS INIT") && upper.contains("ERROR")) return "Ошибка инициализации автомобильной шины: $raw"
+        if (upper.contains("STOPPED")) return "Запрос остановлен адаптером (STOPPED); результат не получен."
+        if (upper.contains("NO DATA")) return "Адаптер не получил данных от ЭБУ (NO DATA). Причина может быть в неподдерживаемом запросе, адресации или связи."
+        if (upper.contains("BUFFER FULL")) return "Переполнен буфер ELM327; ответ неполный."
+        if (upper.contains("ERROR") || upper.contains("?")) return "Адаптер сообщил ошибку: $raw"
+
+        val compact = upper.replace(Regex("[^0-9A-F]"), "")
         val negative = Regex("7F([0-9A-F]{2})([0-9A-F]{2})").find(compact)
         if (negative != null) {
             val service = negative.groupValues[1]
             val nrc = negative.groupValues[2]
             val reason = when (nrc) {
+                "10" -> "общий отказ"
                 "11" -> "сервис не поддерживается ЭБУ"
                 "12" -> "запрошенная функция или PID не поддерживается"
                 "13" -> "неверная длина или формат запроса"
                 "21" -> "ЭБУ занят, повторите запрос позже"
                 "22" -> "условия выполнения запроса сейчас не соблюдены"
                 "31" -> "запрошенный параметр или диапазон недоступен"
+                "33" -> "доступ запрещён"
+                "35" -> "неверный ключ доступа"
+                "36" -> "превышено число попыток доступа"
+                "37" -> "необходимо выждать перед новой попыткой доступа"
                 "78" -> "ЭБУ ещё выполняет запрос"
                 else -> "отрицательный ответ ЭБУ, код причины $nrc"
             }
-            return "ЭБУ отклонил запрос (ответ 7F $service $nrc): $reason."
+            return "ОТКАЗ ЭБУ: ответ 7F $service $nrc — $reason. Параметр не прочитан."
         }
 
         return when (command) {
-            "ATDP" -> if (response.isBlank()) {
-                "Адаптер не сообщил название протокола."
-            } else {
-                "Ответ адаптера о протоколе: ${response.trim()}"
-            }
+            "ATDP" -> if (raw.isBlank()) "Адаптер не сообщил название протокола."
+                else "Ответ ELM327 о протоколе: $raw. AUTO означает автоматический выбор, а не подтверждённый протокол ЭБУ."
             "0100" -> {
                 val match = Regex("4100([0-9A-F]{8})").find(compact)
                 if (match != null) {
                     val mask = match.groupValues[1]
-                    if (mask == "00000000") {
-                        "ЭБУ вернул нулевую маску поддерживаемых PID. Это не доказывает отсутствие связи с Renault ЭБУ."
-                    } else {
-                        "Получена маска поддерживаемых PID: $mask"
-                    }
-                } else {
-                    "Не удалось распознать стандартный ответ 0100. Сохрани сырой ответ для анализа."
-                }
+                    if (mask == "00000000") "ЭБУ вернул нулевую маску поддерживаемых PID. Это не доказывает отсутствие связи с Renault ЭБУ."
+                    else "Положительный ответ OBD-II 41 00. Маска поддерживаемых PID: $mask"
+                } else "Положительный ответ 0100 не распознан. Сырой ответ: $raw"
             }
             "010C" -> {
                 val match = Regex("410C([0-9A-F]{4})").find(compact)
-                if (match != null) {
-                    val value = match.groupValues[1].toLong(16)
-                    val rpm = value / 4.0
-                    "Расчётные обороты двигателя: ${"%.0f".format(java.util.Locale.US, rpm)} об/мин."
-                } else {
-                    "Обороты не распознаны. Сохрани сырой ответ для анализа."
-                }
+                if (match != null) "Положительный ответ OBD-II 41 0C. Расчётные обороты: ${"%.0f".format(java.util.Locale.US, match.groupValues[1].toLong(16) / 4.0)} об/мин."
+                else "Положительный ответ с данными оборотов не получен. Сырой ответ: $raw"
             }
             "010D" -> {
                 val match = Regex("410D([0-9A-F]{2})").find(compact)
-                if (match != null) {
-                    "Расчётная скорость: ${match.groupValues[1].toInt(16)} км/ч."
-                } else {
-                    "Скорость не распознана. Сохрани сырой ответ для анализа."
-                }
+                if (match != null) "Положительный ответ OBD-II 41 0D. Скорость: ${match.groupValues[1].toInt(16)} км/ч."
+                else "Положительный ответ со скоростью не получен. Сырой ответ: $raw"
             }
             "03" -> {
                 val data = Regex("43([0-9A-F]+)").find(compact)?.groupValues?.get(1)
-                if (data == null) {
-                    "ЭБУ не вернул распознаваемые коды в стандартном режиме 03. Это не означает, что ошибок нет в блоках Renault."
-                } else {
+                if (data == null) "Положительный ответ режима 03 не распознан. Нельзя делать вывод об отсутствии ошибок."
+                else {
                     val codes = data.chunked(4).filter { it.length == 4 && it != "0000" }.map { decodeObdDtc(it) }
-                    if (codes.isEmpty()) "Положительный ответ 43: ненулевые стандартные DTC в ответе не обнаружены. Блоки Renault отдельно не опрошены."
-                    else "Стандартные коды OBD-II: " + codes.joinToString(", ")
+                    if (codes.isEmpty()) "Положительный ответ 43: ненулевые стандартные DTC в полученных данных не обнаружены. Блоки Renault отдельно не опрошены."
+                    else "Положительный ответ 43. Стандартные коды OBD-II: " + codes.joinToString(", ")
                 }
             }
-            "0105" -> decodePid(compact, "4105", "Температура охлаждающей жидкости") { b -> "${b - 40} °C" }
-            "010F" -> decodePid(compact, "410F", "Температура воздуха на впуске") { b -> "${b - 40} °C" }
-            "0111" -> decodePid(compact, "4111", "Положение дросселя") { b -> "${"%.1f".format(java.util.Locale.US, b * 100.0 / 255.0)} %" }
+            "0105" -> decodePid(compact, "4105", "Положительный ответ OBD-II 41 05 — температура ОЖ") { b -> "${b - 40} °C" }
+            "010F" -> decodePid(compact, "410F", "Положительный ответ OBD-II 41 0F — температура воздуха") { b -> "${b - 40} °C" }
+            "0111" -> decodePid(compact, "4111", "Положительный ответ OBD-II 41 11 — положение дросселя") { b -> "${"%.1f".format(java.util.Locale.US, b * 100.0 / 255.0)} %" }
             "0110" -> {
                 val m = Regex("4110([0-9A-F]{4})").find(compact)
-                if (m == null) "Ответ MAF не распознан или PID не поддерживается."
-                else "${((m.groupValues[1].substring(0,2).toInt(16)*256 + m.groupValues[1].substring(2,4).toInt(16))/100.0)} г/с"
+                if (m == null) "Положительный ответ OBD-II для MAF не получен. Сырой ответ: $raw"
+                else "Положительный ответ OBD-II 41 10 — MAF: ${((m.groupValues[1].substring(0,2).toInt(16)*256 + m.groupValues[1].substring(2,4).toInt(16))/100.0)} г/с"
             }
             "0142" -> {
                 val m = Regex("4142([0-9A-F]{4})").find(compact)
-                if (m == null) "Ответ напряжения блока не распознан или PID не поддерживается."
-                else "${((m.groupValues[1].toInt(16))/1000.0)} В"
+                if (m == null) "Положительный ответ OBD-II для напряжения не получен. Сырой ответ: $raw"
+                else "Положительный ответ OBD-II 41 42 — напряжение: ${((m.groupValues[1].toInt(16))/1000.0)} В"
             }
-            else -> "Получен ответ: ${response.ifBlank { "(нет ответа)" }}"
+            else -> "Ответ адаптера/ЭБУ не классифицирован: $raw"
         }
     }
 
