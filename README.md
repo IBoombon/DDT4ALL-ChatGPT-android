@@ -13,10 +13,12 @@ Android application prototype for Renault diagnostics. The current development b
 - Serializes initialization and diagnostic requests to prevent overlapping ELM327 transactions.
 - Shows decoded RPM and speed when the ECU returns standard OBD-II response frames; otherwise preserves the raw response in the log.
 - Displays adapter responses in an on-screen log.
+- Imports a compact offline Laguna II TCOM 116 data pack from ZIP storage.
+- Reads the imported vehicle profile and browses ECU session XML; optimizer `.p` dictionaries are consumed as converted JSON, never deserialized in the Android app.
 
 ## Not implemented yet
 
-This prototype is **not yet a complete DDT4ALL port**. Renault-specific ECU identification and sessions, Renault ECU fault-code decoding, live Renault parameters, ECU configuration, actuator tests, and PIN extraction are not implemented. Standard OBD-II read-only requests are experimental and depend on ECU support. Negative KWP/OBD responses are displayed with their response code; a positive Mode 03 response containing only zero bytes is reported as no non-zero standard DTCs in that response, not as proof that all vehicle modules are fault-free.
+This prototype is **not yet a complete DDT4ALL port**. The new database browser reads profile/session metadata and counts XML diagnostic objects; it does not yet execute Renault ECU diagnostic services, decode Renault fault codes, read live Renault parameters, or perform ECU configuration, actuator tests, or PIN extraction. Standard OBD-II read-only requests are experimental and depend on ECU support. Negative KWP/OBD responses are displayed with their response code; a positive Mode 03 response containing only zero bytes is reported as no non-zero standard DTCs in that response, not as proof that all vehicle modules are fault-free.
 
 ## Safety
 
@@ -28,6 +30,16 @@ For the first vehicle test:
 3. Open the app and choose the paired adapter.
 4. Review the log and run `0100` only if the adapter is connected.
 5. If connection fails, record the exact adapter name and log message; do not repeatedly cycle the ignition or issue unknown commands.
+
+## Laguna II offline data pack
+
+The repository includes `tools/build_laguna_pack.py`. Run it on a computer with Python 3 using the original PyRen/DDT archive:
+
+```bash
+python tools/build_laguna_pack.py pyrendata_232_and_Lada_and_OldRenault.zip --output laguna2-tcom116-data.zip
+```
+
+The generated ZIP contains the TCOM 116 profile, matching `Uces.xml` definitions, referenced session XML files, and optimizer dictionaries converted to JSON. The converter accepts only a restricted set of string/dictionary Pickle opcodes (protocol 0/2); it rejects object-construction and code-execution opcodes. The Android app imports this ZIP using **Импортировать базу Laguna II (ZIP)**, then **Открыть диагностические сеансы TCOM 116**. The initial pack is a curated Laguna II subset, not the entire 600 MB archive. The TCOM ECU list is a list of database candidates, not a scan result for a particular car.
 
 ## Build
 
