@@ -237,22 +237,62 @@ class MainActivity : Activity() {
         val pack = File(filesDir, "renault-laguna2-tcom116.zip")
         try {
             val profile = renaultDataPack.readProfile(pack)
-            val labels = profile.ecus.map { "${it.ecuId} — ${it.label}" }.toTypedArray()
+            val profileJson = JSONObject(assets.open("renault/laguna2_tcom116.json").bufferedReader(Charsets.UTF_8).use { it.readText() })
+            val groups = profileJson.getJSONArray("ecuGroups")
+            val networkNames = mapOf(0 to "CAN", 1 to "ISO/K-Line")
+            // Catalogue grouping only: entries are not proof that a module is fitted.
+            val groupItems = ArrayList<Pair<String, List<RenaultDataPack.EcuEntry>>>()
+            for (i in 0 until groups.length()) {
+                val group = groups.getJSONObject(i)
+                val familyId = group.optInt("familyId")
+                val entries = profile.ecus.filter { it.familyId == familyId.toString() }
+                if (entries.isNotEmpty()) groupItems.add(group.optString("system", "Система " + familyId) to entries)
+            }
+            if (groupItems.isEmpty()) groupItems.add("Все варианты ЭБУ" to profile.ecus)
+            val systemLabels = groupItems.map { it.first + " (" + it.second.size + ")" }.toTypedArray()
             AlertDialog.Builder(this)
-                .setTitle("TCOM ${profile.tcom}: выберите вариант ЭБУ")
-                .setItems(labels) { _, which ->
-                    val ecu = profile.ecus[which]
-                    thread(name = "renault-session-read") {
-                        try {
-                            val details = renaultDataPack.describeEcu(pack, ecu)
-                            runOnUiThread { AlertDialog.Builder(this).setTitle("ЭБУ ${ecu.ecuId}").setMessage(details).setPositiveButton("Закрыть", null).show() }
-                        } catch (e: Exception) { runOnUiThread { appendLog("Ошибка чтения диагностического сеанса: ${e.message}") } }
-                    }
+                .setTitle("TCOM " + profile.tcom + ": выберите систему")
+                .setItems(systemLabels) { _, systemIndex ->
+                    val (systemName, entries) = groupItems[systemIndex]
+                    val ecuLabels = entries.map { it.ecuId + " — " + it.label.ifBlank { "Название не указано" } }.toTypedArray()
+                    AlertDialog.Builder(this)
+                        .setTitle(systemName)
+                        .setItems(ecuLabels) { _, ecuIndex ->
+                            val ecu = entries[ecuIndex]
+                            thread(name = "renault-session-read") {
+                                try {
+                                    val details = renaultDataPack.describeEcu(pack, ecu)
+                                    var networkIndex = -1
+                                    for (g in 0 until groups.length()) {
+                                        val item = groups.getJSONObject(g)
+                                        val refs = item.getJSONArray("ecus")
+                                        if (item.optInt("familyId") == ecu.familyId.toIntOrNull() && (0 until refs.length()).any { j -> refs.getJSONObject(j).optString("id") == ecu.ecuId }) {
+                                            networkIndex = item.optInt("networkIndex", -1)
+                                            break
+                                        }
+                                    }
+                                    val network = networkNames[networkIndex] ?: "сеть не указана"
+                                    val networks = profileJson.getJSONArray("networks")
+                                    val networkDetails = (0 until networks.length()).firstOrNull { networks.getJSONObject(it).optInt("index") == networkIndex }?.let { index ->
+                                        val node = networks.getJSONObject(index)
+                                        val pins = node.getJSONObject("pins")
+                                        val pinText = pins.keys().asSequence().map { key -> key + "=" + pins.getInt(key) }.joinToString(", ")
+                                        network + " (контакты OBD: " + pinText + ")"
+                                    } ?: network
+                                    val message = "Система: " + systemName + "\nСеть: " + networkDetails + "\n\n" + details + "\n\nВНИМАНИЕ: это вариант из каталога TCOM116, а не результат обнаружения блока в автомобиле. Автоматическое сканирование и отправка Renault-команд пока не выполняются."
+                                    runOnUiThread { AlertDialog.Builder(this).setTitle("Вариант ЭБУ " + ecu.ecuId).setMessage(message).setPositiveButton("Закрыть", null).show() }
+                                } catch (e: Exception) { runOnUiThread { appendLog("Ошибка чтения диагностического сеанса: " + e.message) } }
+                            }
+                        }
+                        .setNegativeButton("Назад") { _, _ -> showImportedLagunaPack() }
+                        .setNeutralButton("Закрыть", null)
+                        .show()
                 }
                 .setNegativeButton("Закрыть", null)
                 .show()
-        } catch (e: Exception) { appendLog("База ещё не импортирована. Выберите ZIP через кнопку импорта. Причина: ${e.message}") }
+        } catch (e: Exception) { appendLog("База ещё не импортирована. Выберите ZIP через кнопку импорта. Причина: " + e.message) }
     }
+
     private fun showLagunaProfile() {
         try {
             val jsonText = assets.open("renault/laguna2_tcom116.json")
